@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { InputWithButton } from "./InputWithButton";
 import { Brain } from "lucide-react";
 import Markdown from "react-markdown";
+import ErrorAlert from "./ErrorAlert";
 
 export default function Chat() {
   const [aiMessages, setAiMessages] = useState([
@@ -64,6 +65,7 @@ export default function Chat() {
         }
       } else {
         console.error("Failed to initiate chat stream", res.status);
+        setError({ isError: true, msg: "Failed to initiate chat stream" });
       }
     } catch (error) {
       console.log(error);
@@ -74,40 +76,46 @@ export default function Chat() {
   };
 
   return (
-    <div className="border border-input rounded-xl p-2 max-w-[800px] w-full relative">
-      <div className="flex flex-col gap-4 max-h-[450px] overflow-y-auto pr-4">
-        {aiMessages.map((message, index) => (
-          <div
-            key={index}
-            className={`p-2 rounded-md flex ${
-              message.role === "assistant" ? "" : `border border-input self-end`
-            }`}
-          >
-            <div className="flex gap-2">
-              <div className="flex-shrink-0">
-                {message.role === "assistant" ? (
-                  <div className="border border-input rounded-full p-1">
-                    <Brain className="w-[24px] h-[24px]" />
-                  </div>
-                ) : (
-                  ""
-                )}
-              </div>
-              <div>
-                {" "}
-                <Markdown className="prose">{message.content}</Markdown>
+    <div className="max-w-[800px] w-full  flex flex-col gap-4">
+      <div className="border border-input rounded-xl p-2 relative">
+        <div className="flex flex-col gap-4 max-h-[450px] overflow-y-auto pr-4">
+          {aiMessages.map((message, index) => (
+            <div
+              key={index}
+              className={`p-2 rounded-md flex ${
+                message.role === "assistant"
+                  ? ""
+                  : `border border-input self-end`
+              }`}
+            >
+              <div className="flex gap-2">
+                <div className="flex-shrink-0">
+                  {message.role === "assistant" ? (
+                    <div className="border border-input rounded-full p-1">
+                      <Brain className="w-[24px] h-[24px]" />
+                    </div>
+                  ) : (
+                    ""
+                  )}
+                </div>
+                <div>
+                  {" "}
+                  <Markdown className="prose">{message.content}</Markdown>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-        <div ref={bottomOfThePanelRef}></div>
+          ))}
+          <div ref={bottomOfThePanelRef}></div>
+        </div>
+        <InputWithButton
+          userMessage={userMessage}
+          setUserMessage={setUserMessage}
+          sendMessage={sendMessage}
+          loading={loading}
+        />
       </div>
-      <InputWithButton
-        userMessage={userMessage}
-        setUserMessage={setUserMessage}
-        sendMessage={sendMessage}
-        loading={loading}
-      />
+
+      {error.isError ? <ErrorAlert errorMsg={error.msg} /> : ""}
     </div>
   );
 }
