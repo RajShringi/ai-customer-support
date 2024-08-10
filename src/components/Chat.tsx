@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { InputWithButton } from "./InputWithButton";
 import { Brain } from "lucide-react";
 import Markdown from "react-markdown";
@@ -11,16 +11,28 @@ export default function Chat() {
       content: "Hi I am Fortnite assistant. How can I help you?",
     },
   ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState({ isError: false, msg: "" });
   const [userMessage, setUserMessage] = useState("");
+  const bottomOfThePanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (bottomOfThePanelRef.current) {
+      bottomOfThePanelRef.current.scrollIntoView();
+    }
+  }, [aiMessages]);
 
   const sendMessage = async () => {
-    setUserMessage("");
-    setAiMessages((aiMessages) => [
-      ...aiMessages,
-      { role: "user", content: userMessage },
-    ]);
     try {
-      const res = await fetch("/api/chat", {
+      setLoading(true);
+      setUserMessage("");
+      setAiMessages((aiMessages) => [
+        ...aiMessages,
+        { role: "user", content: userMessage },
+        { role: "assistant", content: "" },
+      ]);
+
+      const res = await fetch("api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -30,18 +42,34 @@ export default function Chat() {
           { role: "user", content: userMessage },
         ]),
       });
-      if (!res.ok) {
-        throw new Error("something went wrong");
-      }
-      const data = await res.json();
-      console.log(data);
 
-      setAiMessages((aiMessages) => [
-        ...aiMessages,
-        { role: "assistant", content: data.message },
-      ]);
+      if (res.ok && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+
+          setAiMessages((aiMessages) => {
+            let otherMessages = aiMessages.slice(0, aiMessages.length - 1);
+            let lastMessage = aiMessages[aiMessages.length - 1];
+            return [
+              ...otherMessages,
+              { role: "assistant", content: lastMessage.content + chunk },
+            ];
+          });
+        }
+      } else {
+        console.error("Failed to initiate chat stream", res.status);
+      }
     } catch (error) {
       console.log(error);
+      setError({ isError: true, msg: "something went wrong" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,11 +100,13 @@ export default function Chat() {
             </div>
           </div>
         ))}
+        <div ref={bottomOfThePanelRef}></div>
       </div>
       <InputWithButton
         userMessage={userMessage}
         setUserMessage={setUserMessage}
         sendMessage={sendMessage}
+        loading={loading}
       />
     </div>
   );
