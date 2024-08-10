@@ -51,15 +51,29 @@ Absolutely! The current Battle Pass offers a variety of exclusive rewards, inclu
 export async function POST(req: Request) {
   ///api/chat -> POST Method
   const data = await req.json();
-  console.log(data);
 
   const completion = await openai.chat.completions.create({
     messages: [{ role: "system", content: systemPrompt }, ...data],
     model: "meta-llama/llama-3.1-8b-instruct:free",
+    stream: true,
   });
-  console.log(completion.choices[0].message.content);
-  return NextResponse.json(
-    { message: completion.choices[0].message.content },
-    { status: 200 }
-  );
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      for await (const chunk of completion) {
+        const content = chunk.choices[0].delta.content || "";
+        const encodedContent = new TextEncoder().encode(`${content}`);
+        controller.enqueue(encodedContent);
+      }
+      controller.close();
+    },
+  });
+
+  return new NextResponse(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
